@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const path = require('path');
 const config = require('./config');
 const { generalLimiter } = require('./middleware/rateLimiter');
 
@@ -63,13 +64,18 @@ app.use(generalLimiter);
 // Serve static files
 app.use(express.static('public'));
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Server is running',
-    timestamp: new Date().toISOString()
-  });
+// Root route - redirect to main app
+app.get('/', (req, res) => {
+  res.redirect('/index.html');
+});
+
+// Explicit routes for HTML files
+app.get('/index.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/admin.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 // Health check endpoint
