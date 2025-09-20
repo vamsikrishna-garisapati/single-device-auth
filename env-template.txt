@@ -1,0 +1,40 @@
+# Single Device Authentication System - Environment Configuration
+# Copy this file to .env and update the values for your environment
+
+# Server Configuration
+NODE_ENV=development
+PORT=3001
+
+# Database Configuration
+# For local MongoDB (default)
+MONGODB_URI=mongodb://localhost:27017/single-device-auth
+
+# For MongoDB Atlas (cloud) - RECOMMENDED FOR PRODUCTION
+# MONGODB_URI=mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/single-device-auth?retryWrites=true&w=majority
+
+# Other production database options:
+# Railway MongoDB: mongodb://mongo:password@containers-us-west-xxx.railway.app:xxxx/single-device-auth
+# PlanetScale MySQL: mysql://username:password@aws.connect.psdb.cloud/single-device-auth?sslaccept=strict
+
+# JWT Configuration
+# Generate a strong secret: openssl rand -base64 32
+JWT_SECRET=Fl8cyGu+YYq64x5NM2ZeaScdocl8GjzGlZH3kNhwGR4=
+JWT_EXPIRES_IN=24h
+
+# Admin Configuration (for initial setup)
+ADMIN_USERNAME=admin
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=admin123
+
+# CORS Configuration (comma-separated list of allowed origins)
+# For local development
+ALLOWED_ORIGINS=http://localhost:3001,http://127.0.0.1:3001
+
+# For production (replace with your actual domain)
+# ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+
+# Security Notes:
+# 1. Change JWT_SECRET to a strong, unique value
+# 2. Update ALLOWED_ORIGINS for production
+# 3. Use MongoDB Atlas for production database
+# 4. Never commit this file with real secrets to version control
