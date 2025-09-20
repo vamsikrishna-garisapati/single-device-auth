@@ -272,7 +272,7 @@ router.post('/login', authLimiter, async (req, res) => {
 });
 
 // Logout user
-router.post('/logout', verifyToken, validateDevice, async (req, res) => {
+router.post('/logout', verifyToken, async (req, res) => {
   try {
     // In a real application, you might want to blacklist the token
     // For this POC, we'll just return success
