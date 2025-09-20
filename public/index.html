@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Single Device Authentication</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .logo p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .switch-form {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+
+        .switch-form a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .switch-form a:hover {
+            text-decoration: underline;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .device-info {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .device-info h4 {
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .device-info p {
+            margin: 4px 0;
+            color: #666;
+        }
+
+        .request-status {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .request-approved {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+
+        .request-rejected {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>🔒 SecureAuth</h1>
+            <p>Single Device Authentication System</p>
+        </div>
+
+        <!-- Login Form -->
+        <div id="loginForm">
+            <div id="loginAlert" class="alert hidden"></div>
+            <div id="loginLoading" class="loading">
+                <div class="spinner"></div>
+                <p>Logging in...</p>
+            </div>
+            <form id="loginFormElement">
+                <div class="form-group">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" required>
+                </div>
+                <button type="submit" class="btn" id="loginBtn">Login</button>
+            </form>
+            <div class="switch-form">
+                Don't have an account? <a href="#" onclick="showRegister()">Register</a>
+            </div>
+        </div>
+
+        <!-- Register Form -->
+        <div id="registerForm" class="hidden">
+            <div id="registerAlert" class="alert hidden"></div>
+            <div id="registerLoading" class="loading">
+                <div class="spinner"></div>
+                <p>Creating account...</p>
+            </div>
+            <form id="registerFormElement">
+                <div class="form-group">
+                    <label for="registerUsername">Username</label>
+                    <input type="text" id="registerUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerEmail">Email</label>
+                    <input type="email" id="registerEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">Password</label>
+                    <input type="password" id="registerPassword" required minlength="6">
+                </div>
+                <button type="submit" class="btn" id="registerBtn">Register</button>
+            </form>
+            <div class="switch-form">
+                Already have an account? <a href="#" onclick="showLogin()">Login</a>
+            </div>
+        </div>
+
+        <!-- Device Change Request Form -->
+        <div id="deviceChangeForm" class="hidden">
+            <div id="deviceChangeAlert" class="alert hidden"></div>
+            <div class="device-info">
+                <h4>Device Information</h4>
+                <p id="currentDeviceInfo"></p>
+            </div>
+            <form id="deviceChangeFormElement">
+                <div class="form-group">
+                    <label for="changeReason">Reason for Device Change</label>
+                    <textarea id="changeReason" class="form-group" style="width: 100%; padding: 12px 16px; border: 2px solid #e1e5e9; border-radius: 10px; font-size: 16px; resize: vertical; min-height: 80px;" placeholder="Please explain why you need to change your device..."></textarea>
+                </div>
+                <button type="submit" class="btn" id="deviceChangeBtn">Request Device Change</button>
+            </form>
+            <div class="switch-form">
+                <a href="#" onclick="showLogin()">Back to Login</a>
+            </div>
+        </div>
+
+        <!-- Request Status -->
+        <div id="requestStatus" class="hidden">
+            <div id="requestStatusAlert" class="alert hidden"></div>
+            <div class="device-info">
+                <h4>Request Information</h4>
+                <p id="requestDetails"></p>
+            </div>
+            <div class="switch-form">
+                <a href="#" onclick="showLogin()">Back to Login</a>
+            </div>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="dashboard" class="hidden">
+            <div id="dashboardAlert" class="alert hidden"></div>
+            <div class="device-info">
+                <h4>Welcome, <span id="userName"></span>!</h4>
+                <p>You are logged in from an authorized device.</p>
+                <p><strong>Email:</strong> <span id="userEmail"></span></p>
+                <p><strong>Role:</strong> <span id="userRole"></span></p>
+            </div>
+            <div class="form-group">
+                <button type="button" class="btn" onclick="logout()">Logout</button>
+            </div>
+            <div class="switch-form">
+                <a href="#" onclick="requestDeviceChange()">Request Device Change</a> |
+                <a href="#" onclick="adminLogin()">Admin Login</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001/api';
+        let currentUser = null;
+        let currentToken = null;
+
+        // Show/hide forms
+        function showLogin() {
+            hideAllForms();
+            document.getElementById('loginForm').classList.remove('hidden');
+        }
+
+        function showRegister() {
+            hideAllForms();
+            document.getElementById('registerForm').classList.remove('hidden');
+        }
+
+        function showDeviceChange() {
+            hideAllForms();
+            document.getElementById('deviceChangeForm').classList.remove('hidden');
+            updateDeviceInfo();
+        }
+
+        function showRequestStatus(requestId) {
+            hideAllForms();
+            document.getElementById('requestStatus').classList.remove('hidden');
+            checkRequestStatus(requestId);
+        }
+
+        function showDashboard() {
+            hideAllForms();
+            document.getElementById('dashboard').classList.remove('hidden');
+            updateUserInfo();
+        }
+
+        function hideAllForms() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('deviceChangeForm').classList.add('hidden');
+            document.getElementById('requestStatus').classList.add('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+        }
+
+        // Update device info
+        function updateDeviceInfo() {
+            const deviceInfo = `
+                User Agent: ${navigator.userAgent}<br>
+                Platform: ${navigator.platform}<br>
+                Screen: ${screen.width}x${screen.height}<br>
+                Time: ${new Date().toLocaleString()}
+            `;
+            document.getElementById('currentDeviceInfo').innerHTML = deviceInfo;
+        }
+
+        // Update user info
+        function updateUserInfo() {
+            if (currentUser) {
+                document.getElementById('userName').textContent = currentUser.username;
+                document.getElementById('userEmail').textContent = currentUser.email;
+                document.getElementById('userRole').textContent = currentUser.role;
+            }
+        }
+
+        // Show alert
+        function showAlert(formId, message, type = 'error') {
+            const alertElement = document.getElementById(formId + 'Alert');
+            alertElement.textContent = message;
+            alertElement.className = `alert alert-${type}`;
+            alertElement.classList.remove('hidden');
+        }
+
+        function hideAlert(formId) {
+            document.getElementById(formId + 'Alert').classList.add('hidden');
+        }
+
+        // API calls
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    'X-Screen-Resolution': `${screen.width}x${screen.height}`,
+                    'X-Color-Depth': screen.colorDepth,
+                    'X-Pixel-Ratio': window.devicePixelRatio || 1,
+                    'X-Hardware-Concurrency': navigator.hardwareConcurrency || 'unknown',
+                    'X-Max-Touch-Points': navigator.maxTouchPoints || 0,
+                    'X-Platform': navigator.platform,
+                    'X-Language': navigator.language,
+                    'X-Languages': navigator.languages ? navigator.languages.join(',') : navigator.language
+                }
+            };
+
+            if (currentToken) {
+                options.headers['Authorization'] = `Bearer ${currentToken}`;
+            }
+
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.message || 'Request failed');
+                }
+                
+                return result;
+            } catch (error) {
+                throw error;
+            }
+        }
+
+        // Register user
+        document.getElementById('registerFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const btn = document.getElementById('registerBtn');
+            const loading = document.getElementById('registerLoading');
+            btn.disabled = true;
+            loading.classList.add('show');
+            hideAlert('register');
+
+            const userData = {
+                username: document.getElementById('registerUsername').value,
+                email: document.getElementById('registerEmail').value,
+                password: document.getElementById('registerPassword').value
+            };
+
+            try {
+                const result = await apiCall('/auth/register', 'POST', userData);
+                
+                currentUser = result.data.user;
+                currentToken = result.data.token;
+                localStorage.setItem('authToken', currentToken);
+                
+                showAlert('register', 'Registration successful! You are now logged in.', 'success');
+                setTimeout(() => showDashboard(), 1500);
+                
+            } catch (error) {
+                showAlert('register', error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                loading.classList.remove('show');
+            }
+        });
+
+        // Login user
+        document.getElementById('loginFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const btn = document.getElementById('loginBtn');
+            const loading = document.getElementById('loginLoading');
+            btn.disabled = true;
+            loading.classList.add('show');
+            hideAlert('login');
+
+            const loginData = {
+                email: document.getElementById('loginEmail').value,
+                password: document.getElementById('loginPassword').value
+            };
+
+            try {
+                const result = await apiCall('/auth/login', 'POST', loginData);
+                
+                if (result.data.requiresApproval) {
+                    showAlert('login', 'Device change request created. Please wait for admin approval.', 'info');
+                    setTimeout(() => showRequestStatus(result.data.requestId), 1500);
+                } else {
+                    currentUser = result.data.user;
+                    currentToken = result.data.token;
+                    localStorage.setItem('authToken', currentToken);
+                    showAlert('login', 'Login successful!', 'success');
+                    setTimeout(() => showDashboard(), 1500);
+                }
+                
+            } catch (error) {
+                showAlert('login', error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                loading.classList.remove('show');
+            }
+        });
+
+        // Device change request
+        document.getElementById('deviceChangeFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const btn = document.getElementById('deviceChangeBtn');
+            btn.disabled = true;
+            hideAlert('deviceChange');
+
+            const reason = document.getElementById('changeReason').value;
+
+            try {
+                const result = await apiCall('/auth/request-device-change', 'POST', { reason });
+                showAlert('deviceChange', 'Device change request created successfully!', 'success');
+                setTimeout(() => showRequestStatus(result.data.requestId), 1500);
+                
+            } catch (error) {
+                showAlert('deviceChange', error.message, 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // Check request status
+        async function checkRequestStatus(requestId) {
+            try {
+                const result = await apiCall(`/admin/requests/${requestId}`);
+                const request = result.data.request;
+                
+                const statusElement = document.getElementById('requestStatusAlert');
+                statusElement.classList.remove('hidden');
+                
+                if (request.status === 'approved') {
+                    statusElement.className = 'alert request-approved';
+                    statusElement.textContent = 'Your device change request has been approved! You can now login from your new device.';
+                } else if (request.status === 'rejected') {
+                    statusElement.className = 'alert request-rejected';
+                    statusElement.textContent = `Your device change request has been rejected. Reason: ${request.reason || 'No reason provided'}`;
+                } else {
+                    statusElement.className = 'alert request-status';
+                    statusElement.textContent = 'Your device change request is pending admin approval.';
+                }
+                
+                const details = `
+                    Request ID: ${request._id}<br>
+                    Status: ${request.status}<br>
+                    Requested: ${new Date(request.requestedAt).toLocaleString()}<br>
+                    ${request.reviewedAt ? `Reviewed: ${new Date(request.reviewedAt).toLocaleString()}` : ''}
+                `;
+                document.getElementById('requestDetails').innerHTML = details;
+                
+            } catch (error) {
+                document.getElementById('requestStatusAlert').textContent = 'Error checking request status: ' + error.message;
+                document.getElementById('requestStatusAlert').className = 'alert alert-error';
+            }
+        }
+
+        // Request device change from dashboard
+        function requestDeviceChange() {
+            if (!currentToken) {
+                showLogin();
+                return;
+            }
+            showDeviceChange();
+        }
+
+        // Logout
+        async function logout() {
+            try {
+                await apiCall('/auth/logout', 'POST');
+                currentUser = null;
+                currentToken = null;
+                localStorage.removeItem('authToken');
+                showAlert('dashboard', 'Logged out successfully!', 'success');
+                setTimeout(() => showLogin(), 1500);
+            } catch (error) {
+                showAlert('dashboard', 'Logout failed: ' + error.message, 'error');
+            }
+        }
+
+        // Admin login
+        async function adminLogin() {
+            const email = prompt('Admin Email:');
+            const password = prompt('Admin Password:');
+            
+            if (!email || !password) return;
+            
+            try {
+                const result = await apiCall('/auth/login', 'POST', { email, password });
+                
+                if (result.data.user.role === 'admin') {
+                    localStorage.setItem('adminToken', result.data.token);
+                    window.location.href = 'admin.html';
+                } else {
+                    alert('Access denied. Admin privileges required.');
+                }
+            } catch (error) {
+                alert('Admin login failed: ' + error.message);
+            }
+        }
+
+        // Check if user is already logged in
+        async function checkAuthStatus() {
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                currentToken = token;
+                try {
+                    const result = await apiCall('/auth/me');
+                    currentUser = result.data.user;
+                    showDashboard();
+                } catch (error) {
+                    console.error('Auth check failed:', error);
+                    localStorage.removeItem('authToken');
+                    currentToken = null;
+                    currentUser = null;
+                    showLogin();
+                }
+            } else {
+                showLogin();
+            }
+        }
+
+        // Initialize
+        window.addEventListener('load', () => {
+            checkAuthStatus();
+        });
+    </script>
+</body>
+</html>
