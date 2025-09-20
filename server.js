@@ -34,12 +34,18 @@ const corsOptions = {
       return callback(null, true);
     }
     
-    // In production, specify allowed origins
+    // In production, be more permissive for Render deployment
     const allowedOrigins = config.ALLOWED_ORIGINS;
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    // Allow the current domain and any subdomain
+    if (allowedOrigins.some(allowedOrigin => 
+      origin === allowedOrigin || 
+      origin.endsWith('.onrender.com') ||
+      origin.includes('render.com')
+    )) {
       callback(null, true);
     } else {
+      console.log('CORS blocked origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -85,6 +91,15 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: config.NODE_ENV
+  });
+});
+
+// Test API endpoint
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'API is working',
+    timestamp: new Date().toISOString()
   });
 });
 
