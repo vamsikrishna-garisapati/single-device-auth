@@ -490,7 +490,18 @@
             }
 
             try {
+                console.log(`Making API call to: ${API_BASE}${endpoint}`);
                 const response = await fetch(`${API_BASE}${endpoint}`, options);
+                console.log(`Response status: ${response.status}, Content-Type: ${response.headers.get('content-type')}`);
+                
+                // Check if response is JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const textResponse = await response.text();
+                    console.error('Non-JSON response received:', textResponse.substring(0, 200));
+                    throw new Error(`Server returned ${response.status}: ${response.statusText}. Please check if the server is running.`);
+                }
+                
                 const result = await response.json();
                 
                 if (!response.ok) {
@@ -503,6 +514,10 @@
                 
                 return result;
             } catch (error) {
+                // If it's a JSON parsing error, provide a more helpful message
+                if (error.message.includes('Unexpected token')) {
+                    throw new Error('Server returned an invalid response. Please check if the server is running correctly.');
+                }
                 throw error;
             }
         }
@@ -524,12 +539,15 @@
             };
 
             try {
+                console.log('Attempting registration with data:', userData);
                 const result = await apiCall('/auth/register', 'POST', userData);
+                console.log('Registration successful:', result);
                 
                 showAlert('register', 'Registration successful! You are now logged in.', 'success');
                 setTimeout(() => handlePostLoginRedirect(result.data.user, result.data.token), 1500);
                 
             } catch (error) {
+                console.error('Registration error:', error);
                 showAlert('register', error.message, 'error');
             } finally {
                 btn.disabled = false;
