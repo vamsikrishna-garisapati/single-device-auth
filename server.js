@@ -158,7 +158,8 @@ const startServer = async () => {
       const adminUser = new User({
         username: process.env.ADMIN_USERNAME || 'admin',
         email: adminEmail,
-        password: process.env.ADMIN_PASSWORD || 'admin123'
+        password: process.env.ADMIN_PASSWORD || 'admin123',
+        role: 'admin'
       });
       
       await adminUser.save();
@@ -166,6 +167,12 @@ const startServer = async () => {
       console.log('⚠️  IMPORTANT: Change admin password in production!');
       console.log(`📧 Admin identified by email: ${adminEmail}`);
     } else {
+      // Ensure existing admin user has correct role
+      if (adminExists.role !== 'admin') {
+        adminExists.role = 'admin';
+        await adminExists.save();
+        console.log('✅ Updated existing admin user role');
+      }
       console.log('✅ Admin user already exists');
       console.log(`📧 Admin identified by email: ${adminEmail}`);
     }

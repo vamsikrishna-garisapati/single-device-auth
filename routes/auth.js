@@ -138,6 +138,7 @@ router.post('/login', authLimiter, async (req, res) => {
       });
     }
 
+
     // Generate device ID for current request
     const deviceId = user.generateDeviceId(req);
 
@@ -157,7 +158,7 @@ router.post('/login', authLimiter, async (req, res) => {
               id: user._id,
               username: user.username,
               email: user.email,
-              role: 'admin'
+              role: user.isAdmin() ? 'admin' : 'user'
             },
             token,
             adminBypass: true

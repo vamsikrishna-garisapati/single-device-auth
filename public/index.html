@@ -688,14 +688,23 @@
         // Logout
         async function logout() {
             try {
+                console.log('Logout initiated...');
                 await apiCall('/auth/logout', 'POST');
+                console.log('Logout API call successful');
+            } catch (error) {
+                console.error('Logout API error:', error);
+            } finally {
+                // Clear all user data and tokens
                 currentUser = null;
                 currentToken = null;
                 localStorage.removeItem('authToken');
+                localStorage.removeItem('adminToken');
+                console.log('All user data and tokens cleared');
                 showAlert('dashboard', 'Logged out successfully!', 'success');
-                setTimeout(() => showLogin(), 1500);
-            } catch (error) {
-                showAlert('dashboard', 'Logout failed: ' + error.message, 'error');
+                setTimeout(() => {
+                    console.log('Redirecting to login...');
+                    showLogin();
+                }, 1500);
             }
         }
 

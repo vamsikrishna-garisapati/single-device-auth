@@ -829,11 +829,16 @@
         // Logout
         async function logout() {
             try {
+                console.log('Admin logout initiated...');
                 await apiCall('/auth/logout', 'POST');
+                console.log('Admin logout API call successful');
             } catch (error) {
                 console.error('Logout error:', error);
             } finally {
+                // Clear all tokens
                 localStorage.removeItem('adminToken');
+                localStorage.removeItem('authToken');
+                console.log('All tokens cleared, redirecting to login...');
                 window.location.href = 'index.html';
             }
         }

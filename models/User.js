@@ -136,7 +136,8 @@ userSchema.methods.isAdmin = function() {
   const adminEmails = [
     'admin@example.com',
     'admin@singlelog.com',
-    'administrator@singlelog.com'
+    'administrator@singlelog.com',
+    'admin2@example.com'
   ];
   
   // Add environment variable admin emails if they exist
@@ -144,7 +145,15 @@ userSchema.methods.isAdmin = function() {
     adminEmails.push(process.env.ADMIN_EMAIL);
   }
   
-  return adminEmails.includes(this.email.toLowerCase());
+  const isAdminEmail = adminEmails.includes(this.email.toLowerCase());
+  
+  // Update role field if this is an admin email but role is not set correctly
+  if (isAdminEmail && this.role !== 'admin') {
+    this.role = 'admin';
+    this.save().catch(err => console.error('Error updating user role:', err));
+  }
+  
+  return isAdminEmail;
 };
 
 // Static method to check if an email belongs to an admin
@@ -152,7 +161,8 @@ userSchema.statics.isAdminEmail = function(email) {
   const adminEmails = [
     'admin@example.com',
     'admin@singlelog.com',
-    'administrator@singlelog.com'
+    'administrator@singlelog.com',
+    'admin2@example.com'
   ];
   
   // Add environment variable admin emails if they exist
