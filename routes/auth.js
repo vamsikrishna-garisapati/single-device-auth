@@ -79,7 +79,7 @@ router.post('/register', authLimiter, async (req, res) => {
           id: user._id,
           username: user.username,
           email: user.email,
-          role: user.role
+          role: user.isAdmin() ? 'admin' : 'user'
         },
         token,
         deviceRegistered: true
@@ -143,6 +143,28 @@ router.post('/login', authLimiter, async (req, res) => {
 
     // Check if device is registered
     if (!user.isDeviceRegistered(deviceId)) {
+      // Admin users can login from any device without restrictions
+      if (user.isAdmin()) {
+        // Register the device for admin user and allow login
+        await user.registerDevice(deviceId, req);
+        const token = generateToken(user._id);
+        
+        return res.json({
+          success: true,
+          message: 'Admin login successful. Device registered automatically.',
+          data: {
+            user: {
+              id: user._id,
+              username: user.username,
+              email: user.email,
+              role: 'admin'
+            },
+            token,
+            adminBypass: true
+          }
+        });
+      }
+      
       // If user has no registered devices (first time login), register the device automatically
       if (user.registeredDevices.length === 0) {
         await user.registerDevice(deviceId, req);
@@ -156,7 +178,7 @@ router.post('/login', authLimiter, async (req, res) => {
               id: user._id,
               username: user.username,
               email: user.email,
-              role: user.role
+              role: user.isAdmin() ? 'admin' : 'user'
             },
             token
           }
@@ -186,7 +208,7 @@ router.post('/login', authLimiter, async (req, res) => {
               id: user._id,
               username: user.username,
               email: user.email,
-              role: user.role
+              role: user.isAdmin() ? 'admin' : 'user'
             },
             token,
             ipChangeDetected: true,
@@ -195,51 +217,24 @@ router.post('/login', authLimiter, async (req, res) => {
         });
       }
       
-      // For truly new devices, create device change request
+      // For truly new devices, return device info for user to choose action
       const currentDeviceId = user.currentDeviceId || 'none';
       const currentDeviceInfo = user.registeredDevices.find(d => d.deviceId === user.currentDeviceId)?.deviceInfo || {};
       
-      // Check if there's already a pending request for this device
-      const existingRequest = await DeviceChangeRequest.findOne({
-        user: user._id,
-        newDeviceId: deviceId,
-        status: 'pending'
-      });
-
-      if (existingRequest) {
-        return res.status(403).json({
-          success: false,
-          message: 'Device change request already exists for this device.',
-          data: {
-            requestId: existingRequest._id,
-            requiresApproval: true
-          }
-        });
-      }
-      
-      const deviceChangeRequest = new DeviceChangeRequest({
-        user: user._id,
-        username: user.username,
-        email: user.email,
-        currentDeviceId: currentDeviceId,
-        newDeviceId: deviceId,
-        newDeviceInfo: {
-          userAgent: req.get('User-Agent') || '',
-          ipAddress: req.ip || req.connection.remoteAddress,
-          platform: req.get('sec-ch-ua-platform') || 'Unknown'
-        },
-        currentDeviceInfo: currentDeviceInfo,
-        reason: 'Login attempt from new device'
-      });
-
-      await deviceChangeRequest.save();
-
       return res.status(403).json({
         success: false,
-        message: 'Device not registered. Device change request created.',
+        message: 'Device not registered. Please choose an action.',
         data: {
-          requestId: deviceChangeRequest._id,
-          requiresApproval: true
+          requiresDeviceAction: true,
+          newDeviceInfo: {
+            userAgent: req.get('User-Agent') || '',
+            ipAddress: req.ip || req.connection.remoteAddress,
+            platform: req.get('sec-ch-ua-platform') || 'Unknown',
+            screenRes: req.get('X-Screen-Resolution') || 'unknown',
+            timezone: req.get('X-Timezone') || 'UTC'
+          },
+          currentDeviceInfo: currentDeviceInfo,
+          deviceId: deviceId
         }
       });
     }
@@ -256,7 +251,7 @@ router.post('/login', authLimiter, async (req, res) => {
           id: user._id,
           username: user.username,
           email: user.email,
-          role: user.role
+          role: user.isAdmin() ? 'admin' : 'user'
         },
         token
       }
@@ -300,7 +295,7 @@ router.get('/me', verifyToken, async (req, res) => {
           id: user._id,
           username: user.username,
           email: user.email,
-          role: user.role,
+          role: user.isAdmin() ? 'admin' : 'user',
           registeredDevices: user.registeredDevices.length,
           currentDeviceId: user.currentDeviceId
         }
@@ -315,7 +310,7 @@ router.get('/me', verifyToken, async (req, res) => {
   }
 });
 
-// Request device change
+// Request device change (authenticated)
 router.post('/request-device-change', verifyToken, async (req, res) => {
   try {
     const user = req.user;
@@ -378,6 +373,134 @@ router.post('/request-device-change', verifyToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to create device change request.'
+    });
+  }
+});
+
+// Request device change (unauthenticated - for new device login)
+router.post('/request-device-change-unauth', authLimiter, async (req, res) => {
+  try {
+    const { email, password, reason, deviceId, newDeviceInfo, currentDeviceInfo } = req.body;
+
+    // Validate required fields
+    if (!email || !password || !deviceId || !newDeviceInfo) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, password, device ID, and device info are required.'
+      });
+    }
+
+    // Find user
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user || !user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials.'
+      });
+    }
+
+    // Check password
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials.'
+      });
+    }
+
+    // Check if device is already registered
+    if (user.isDeviceRegistered(deviceId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'This device is already registered.'
+      });
+    }
+
+    // Check for pending requests
+    const existingRequest = await DeviceChangeRequest.findOne({
+      user: user._id,
+      newDeviceId: deviceId,
+      status: 'pending'
+    });
+
+    if (existingRequest) {
+      return res.status(400).json({
+        success: false,
+        message: 'Device change request already exists for this device.'
+      });
+    }
+
+    // Create device change request
+    const currentDeviceId = user.currentDeviceId || 'none';
+    
+    const deviceChangeRequest = new DeviceChangeRequest({
+      user: user._id,
+      username: user.username,
+      email: user.email,
+      currentDeviceId: currentDeviceId,
+      newDeviceId: deviceId,
+      newDeviceInfo: newDeviceInfo,
+      currentDeviceInfo: currentDeviceInfo || {},
+      reason: reason || 'Login attempt from new device'
+    });
+
+    await deviceChangeRequest.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Device change request created successfully.',
+      data: {
+        requestId: deviceChangeRequest._id,
+        status: deviceChangeRequest.status
+      }
+    });
+
+  } catch (error) {
+    console.error('Unauthenticated device change request error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create device change request.'
+    });
+  }
+});
+
+// Register new device (user choice)
+router.post('/register-device', verifyToken, async (req, res) => {
+  try {
+    const user = req.user;
+    const deviceId = user.generateDeviceId(req);
+
+    // Check if device is already registered
+    if (user.isDeviceRegistered(deviceId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'This device is already registered.'
+      });
+    }
+
+    // Register the new device
+    await user.registerDevice(deviceId, req);
+    const token = generateToken(user._id);
+
+    res.json({
+      success: true,
+      message: 'Device registered successfully.',
+      data: {
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          role: user.isAdmin() ? 'admin' : 'user'
+        },
+        token
+      }
+    });
+
+  } catch (error) {
+    console.error('Device registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to register device.'
     });
   }
 });

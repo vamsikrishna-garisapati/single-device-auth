@@ -151,21 +151,23 @@ const startServer = async () => {
     
     // Create default admin user if it doesn't exist
     const User = require('./models/User');
-    const adminExists = await User.findOne({ role: 'admin' });
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
+    const adminExists = await User.findOne({ email: adminEmail });
     
     if (!adminExists) {
       const adminUser = new User({
         username: process.env.ADMIN_USERNAME || 'admin',
-        email: process.env.ADMIN_EMAIL || 'admin@example.com',
-        password: process.env.ADMIN_PASSWORD || 'admin123',
-        role: 'admin'
+        email: adminEmail,
+        password: process.env.ADMIN_PASSWORD || 'admin123'
       });
       
       await adminUser.save();
       console.log(`⚠️  Default admin user created: ${adminUser.email} / ${process.env.ADMIN_PASSWORD || 'admin123'}`);
       console.log('⚠️  IMPORTANT: Change admin password in production!');
+      console.log(`📧 Admin identified by email: ${adminEmail}`);
     } else {
       console.log('✅ Admin user already exists');
+      console.log(`📧 Admin identified by email: ${adminEmail}`);
     }
     
     const server = app.listen(config.PORT, () => {

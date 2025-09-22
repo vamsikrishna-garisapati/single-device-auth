@@ -50,7 +50,7 @@ const verifyToken = async (req, res, next) => {
 
 // Check if user is admin
 const requireAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
+  if (!req.user.isAdmin()) {
     return res.status(403).json({ 
       success: false, 
       message: 'Access denied. Admin privileges required.' 
@@ -64,6 +64,20 @@ const validateDevice = async (req, res, next) => {
   try {
     const user = req.user;
     const deviceId = user.generateDeviceId(req);
+    
+    // Admin users can bypass device restrictions
+    if (user.isAdmin()) {
+      // Register the device if not already registered
+      if (!user.isDeviceRegistered(deviceId)) {
+        await user.registerDevice(deviceId, req);
+      }
+      // Update last used time and current device
+      await user.updateDeviceLastUsed(deviceId);
+      user.currentDeviceId = deviceId;
+      await user.save();
+      next();
+      return;
+    }
     
     // Check if device is registered (not just current device)
     if (!user.isDeviceRegistered(deviceId)) {

@@ -262,6 +262,39 @@
             </div>
         </div>
 
+        <!-- Device Selection Form -->
+        <div id="deviceSelectionForm" class="hidden">
+            <div id="deviceSelectionAlert" class="alert hidden"></div>
+            <div class="device-info">
+                <h4>New Device Detected</h4>
+                <p id="newDeviceInfo"></p>
+            </div>
+            <div class="device-info">
+                <h4>Current Registered Device</h4>
+                <p id="currentDeviceInfo"></p>
+            </div>
+            <div class="form-group">
+                <p style="text-align: center; margin-bottom: 20px; color: #666;">
+                    Choose how you want to proceed with this new device:
+                </p>
+            </div>
+            <div class="form-group">
+                <button type="button" class="btn" onclick="registerNewDevice()" style="margin-bottom: 10px;">Register This Device</button>
+                <p style="text-align: center; font-size: 12px; color: #666; margin-bottom: 20px;">
+                    This will allow you to login from this device without admin approval
+                </p>
+            </div>
+            <div class="form-group">
+                <button type="button" class="btn" onclick="requestDeviceChange()" style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);">Request Device Change</button>
+                <p style="text-align: center; font-size: 12px; color: #666;">
+                    This will require admin approval to use this device
+                </p>
+            </div>
+            <div class="switch-form">
+                <a href="#" onclick="showLogin()">Back to Login</a>
+            </div>
+        </div>
+
         <!-- Device Change Request Form -->
         <div id="deviceChangeForm" class="hidden">
             <div id="deviceChangeAlert" class="alert hidden"></div>
@@ -306,8 +339,7 @@
                 <button type="button" class="btn" onclick="logout()">Logout</button>
             </div>
             <div class="switch-form">
-                <a href="#" onclick="requestDeviceChange()">Request Device Change</a> |
-                <a href="#" onclick="adminLogin()">Admin Login</a>
+                <a href="#" onclick="requestDeviceChange()">Request Device Change</a>
             </div>
         </div>
     </div>
@@ -316,6 +348,7 @@
         const API_BASE = window.location.origin + '/api';
         let currentUser = null;
         let currentToken = null;
+        let pendingDeviceData = null;
 
         // Show/hide forms
         function showLogin() {
@@ -326,6 +359,13 @@
         function showRegister() {
             hideAllForms();
             document.getElementById('registerForm').classList.remove('hidden');
+        }
+
+        function showDeviceSelection(deviceData) {
+            hideAllForms();
+            document.getElementById('deviceSelectionForm').classList.remove('hidden');
+            pendingDeviceData = deviceData; // Store device data for later use
+            updateDeviceSelectionInfo(deviceData);
         }
 
         function showDeviceChange() {
@@ -349,9 +389,30 @@
         function hideAllForms() {
             document.getElementById('loginForm').classList.add('hidden');
             document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('deviceSelectionForm').classList.add('hidden');
             document.getElementById('deviceChangeForm').classList.add('hidden');
             document.getElementById('requestStatus').classList.add('hidden');
             document.getElementById('dashboard').classList.add('hidden');
+        }
+
+        // Update device selection info
+        function updateDeviceSelectionInfo(deviceData) {
+            const newDeviceInfo = `
+                User Agent: ${deviceData.newDeviceInfo.userAgent}<br>
+                Platform: ${deviceData.newDeviceInfo.platform}<br>
+                Screen: ${deviceData.newDeviceInfo.screenRes}<br>
+                IP: ${deviceData.newDeviceInfo.ipAddress}<br>
+                Timezone: ${deviceData.newDeviceInfo.timezone}<br>
+                Time: ${new Date().toLocaleString()}
+            `;
+            document.getElementById('newDeviceInfo').innerHTML = newDeviceInfo;
+
+            const currentDeviceInfo = deviceData.currentDeviceInfo && Object.keys(deviceData.currentDeviceInfo).length > 0 ? `
+                User Agent: ${deviceData.currentDeviceInfo.userAgent || 'Unknown'}<br>
+                Platform: ${deviceData.currentDeviceInfo.platform || 'Unknown'}<br>
+                IP: ${deviceData.currentDeviceInfo.ipAddress || 'Unknown'}
+            ` : 'No registered device found';
+            document.getElementById('currentDeviceInfo').innerHTML = currentDeviceInfo;
         }
 
         // Update device info
@@ -371,6 +432,22 @@
                 document.getElementById('userName').textContent = currentUser.username;
                 document.getElementById('userEmail').textContent = currentUser.email;
                 document.getElementById('userRole').textContent = currentUser.role;
+            }
+        }
+
+        // Handle post-login redirect based on user role
+        function handlePostLoginRedirect(user, token) {
+            currentUser = user;
+            currentToken = token;
+            localStorage.setItem('authToken', currentToken);
+            
+            if (user.role === 'admin') {
+                // Redirect admin users to admin dashboard
+                localStorage.setItem('adminToken', token);
+                window.location.href = 'admin.html';
+            } else {
+                // Show regular user dashboard
+                showDashboard();
             }
         }
 
@@ -417,6 +494,10 @@
                 const result = await response.json();
                 
                 if (!response.ok) {
+                    // Special handling for device action required (403 status)
+                    if (response.status === 403 && result.data && result.data.requiresDeviceAction) {
+                        return result;
+                    }
                     throw new Error(result.message || 'Request failed');
                 }
                 
@@ -445,12 +526,8 @@
             try {
                 const result = await apiCall('/auth/register', 'POST', userData);
                 
-                currentUser = result.data.user;
-                currentToken = result.data.token;
-                localStorage.setItem('authToken', currentToken);
-                
                 showAlert('register', 'Registration successful! You are now logged in.', 'success');
-                setTimeout(() => showDashboard(), 1500);
+                setTimeout(() => handlePostLoginRedirect(result.data.user, result.data.token), 1500);
                 
             } catch (error) {
                 showAlert('register', error.message, 'error');
@@ -478,15 +555,18 @@
             try {
                 const result = await apiCall('/auth/login', 'POST', loginData);
                 
-                if (result.data.requiresApproval) {
+                if (result.data.adminBypass) {
+                    showAlert('login', 'Admin login successful! Device registered automatically.', 'success');
+                    setTimeout(() => handlePostLoginRedirect(result.data.user, result.data.token), 1500);
+                } else if (result.data.requiresDeviceAction) {
+                    showAlert('login', 'New device detected. Please choose an action.', 'info');
+                    setTimeout(() => showDeviceSelection(result.data), 1500);
+                } else if (result.data.requiresApproval) {
                     showAlert('login', 'Device change request created. Please wait for admin approval.', 'info');
                     setTimeout(() => showRequestStatus(result.data.requestId), 1500);
                 } else {
-                    currentUser = result.data.user;
-                    currentToken = result.data.token;
-                    localStorage.setItem('authToken', currentToken);
                     showAlert('login', 'Login successful!', 'success');
-                    setTimeout(() => showDashboard(), 1500);
+                    setTimeout(() => handlePostLoginRedirect(result.data.user, result.data.token), 1500);
                 }
                 
             } catch (error) {
@@ -508,7 +588,31 @@
             const reason = document.getElementById('changeReason').value;
 
             try {
-                const result = await apiCall('/auth/request-device-change', 'POST', { reason });
+                let result;
+                if (currentToken) {
+                    // Authenticated request
+                    result = await apiCall('/auth/request-device-change', 'POST', { reason });
+                } else {
+                    // Unauthenticated request - need to get login credentials
+                    const email = document.getElementById('loginEmail').value;
+                    const password = document.getElementById('loginPassword').value;
+                    
+                    if (!email || !password) {
+                        showAlert('deviceChange', 'Please enter your login credentials first.', 'error');
+                        btn.disabled = false;
+                        return;
+                    }
+                    
+                    result = await apiCall('/auth/request-device-change-unauth', 'POST', {
+                        email,
+                        password,
+                        reason,
+                        deviceId: pendingDeviceData.deviceId,
+                        newDeviceInfo: pendingDeviceData.newDeviceInfo,
+                        currentDeviceInfo: pendingDeviceData.currentDeviceInfo
+                    });
+                }
+                
                 showAlert('deviceChange', 'Device change request created successfully!', 'success');
                 setTimeout(() => showRequestStatus(result.data.requestId), 1500);
                 
@@ -553,10 +657,29 @@
             }
         }
 
-        // Request device change from dashboard
+        // Register new device
+        async function registerNewDevice() {
+            try {
+                const result = await apiCall('/auth/register-device', 'POST');
+                
+                showAlert('deviceSelection', 'Device registered successfully! You are now logged in.', 'success');
+                setTimeout(() => handlePostLoginRedirect(result.data.user, result.data.token), 1500);
+                
+            } catch (error) {
+                showAlert('deviceSelection', error.message, 'error');
+            }
+        }
+
+        // Request device change from dashboard or device selection
         function requestDeviceChange() {
             if (!currentToken) {
-                showLogin();
+                // If no token and we have pending device data, show device change form for unauthenticated request
+                if (pendingDeviceData) {
+                    showDeviceChange();
+                } else {
+                    showAlert('deviceSelection', 'Please login first to request device change.', 'error');
+                    setTimeout(() => showLogin(), 2000);
+                }
                 return;
             }
             showDeviceChange();
@@ -576,25 +699,9 @@
             }
         }
 
-        // Admin login
+        // Admin login (deprecated - admins are now redirected automatically)
         async function adminLogin() {
-            const email = prompt('Admin Email:');
-            const password = prompt('Admin Password:');
-            
-            if (!email || !password) return;
-            
-            try {
-                const result = await apiCall('/auth/login', 'POST', { email, password });
-                
-                if (result.data.user.role === 'admin') {
-                    localStorage.setItem('adminToken', result.data.token);
-                    window.location.href = 'admin.html';
-                } else {
-                    alert('Access denied. Admin privileges required.');
-                }
-            } catch (error) {
-                alert('Admin login failed: ' + error.message);
-            }
+            alert('Admin users are automatically redirected to the admin panel after login.');
         }
 
         // Check if user is already logged in
@@ -605,7 +712,14 @@
                 try {
                     const result = await apiCall('/auth/me');
                     currentUser = result.data.user;
-                    showDashboard();
+                    
+                    // Check if user is admin and redirect accordingly
+                    if (currentUser.role === 'admin') {
+                        localStorage.setItem('adminToken', token);
+                        window.location.href = 'admin.html';
+                    } else {
+                        showDashboard();
+                    }
                 } catch (error) {
                     console.error('Auth check failed:', error);
                     localStorage.removeItem('authToken');

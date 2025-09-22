@@ -130,5 +130,38 @@ userSchema.methods.updateDeviceLastUsed = function(deviceId) {
   return Promise.resolve();
 };
 
+// Check if user is admin based on email
+userSchema.methods.isAdmin = function() {
+  // Define admin email addresses
+  const adminEmails = [
+    'admin@example.com',
+    'admin@singlelog.com',
+    'administrator@singlelog.com'
+  ];
+  
+  // Add environment variable admin emails if they exist
+  if (process.env.ADMIN_EMAIL) {
+    adminEmails.push(process.env.ADMIN_EMAIL);
+  }
+  
+  return adminEmails.includes(this.email.toLowerCase());
+};
+
+// Static method to check if an email belongs to an admin
+userSchema.statics.isAdminEmail = function(email) {
+  const adminEmails = [
+    'admin@example.com',
+    'admin@singlelog.com',
+    'administrator@singlelog.com'
+  ];
+  
+  // Add environment variable admin emails if they exist
+  if (process.env.ADMIN_EMAIL) {
+    adminEmails.push(process.env.ADMIN_EMAIL);
+  }
+  
+  return adminEmails.includes(email.toLowerCase());
+};
+
 module.exports = mongoose.model('User', userSchema);
 
